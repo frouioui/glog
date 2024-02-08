@@ -39,6 +39,10 @@ import (
 // logDirs lists the candidate directories for new log files.
 var logDirs []string
 
+// tmpDir is declared as a global and set during init()
+// so we do not need to call os.TempDir all the time
+var tmpDir string
+
 var (
 	// If non-empty, overrides the choice of directory in which to write logs.
 	// See createLogDirs for the full list of possible destinations.
@@ -49,10 +53,11 @@ var (
 )
 
 func createLogDirs() {
+	logDirs = []string{}
 	if *logDir != "" {
 		logDirs = append(logDirs, *logDir)
 	}
-	logDirs = append(logDirs, os.TempDir())
+	logDirs = append(logDirs, tmpDir)
 }
 
 var (
@@ -63,6 +68,8 @@ var (
 )
 
 func init() {
+	tmpDir = os.TempDir()
+
 	h, err := os.Hostname()
 	if err == nil {
 		host = shortHostname(h)
@@ -112,14 +119,12 @@ func logName(tag string, t time.Time) (name, link string) {
 	return name, program + "." + tag
 }
 
-var onceLogDirs sync.Once
-
 // create creates a new log file and returns the file and its filename, which
 // contains tag ("INFO", "FATAL", etc.) and t.  If the file is created
 // successfully, create also attempts to update the symlink for that tag, ignoring
 // errors.
 func create(tag string, t time.Time) (f *os.File, filename string, err error) {
-	onceLogDirs.Do(createLogDirs)
+	createLogDirs()
 	if len(logDirs) == 0 {
 		return nil, "", errors.New("log: no log dirs")
 	}
